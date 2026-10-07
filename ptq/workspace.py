@@ -187,10 +187,12 @@ def build_pytorch(
     )
 
     # Full nuke before build: mirrors Driss's local workflow and avoids stale
-    # build graphs after upstream renames/deletes.
+    # build graphs after upstream renames/deletes. -ff also removes nested
+    # repos: a submodule upstream drops (or vendors, like kineto) leaves its
+    # checkout behind, which jobs would then inherit.
     console.print("Nuking local PyTorch checkout artifacts before build...")
     backend.run(
-        f"cd {workspace}/pytorch && git clean -dfx && git submodule sync && git submodule update --init --recursive",
+        f"cd {workspace}/pytorch && git clean -ffdx && git submodule sync && git submodule update --init --recursive",
         check=False,
         stream=True,
     )
