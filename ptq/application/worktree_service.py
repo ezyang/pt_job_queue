@@ -14,6 +14,9 @@ from ptq.domain.models import JobRecord, PtqError
 from ptq.domain.policies import make_job_id
 from ptq.infrastructure.backends import Backend, backend_for_job
 from ptq.infrastructure.job_repository import JobRepository
+from ptq.infrastructure.submodule_worktree import (
+    create_worktree as create_submodule_worktree,
+)
 from ptq.repo_profiles import get_profile
 from ptq.workspace import deploy_scripts
 
@@ -165,11 +168,10 @@ def provision_worktree(
         if profile.uses_custom_worktree_tool:
             cb("Creating worktree with submodules...")
             with _timed("worktree creation", cb):
-                backend.run(
-                    f"cd {workspace}/pytorch && {workspace}/.venv/bin/python tools/create_worktree.py create pytorch "
-                    f"--parent-dir {job_dir} --commit HEAD",
-                    stream=verbose,
-                )
+                for warning in create_submodule_worktree(
+                    f"{workspace}/{profile.dir_name}", worktree_path
+                ):
+                    cb(f"  WARNING: {warning}")
         else:
             cb(f"Creating {profile.name} worktree...")
             with _timed("worktree creation", cb):
