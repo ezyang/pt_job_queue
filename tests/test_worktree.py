@@ -244,18 +244,27 @@ class TestProvisionWorktree:
         def run_side(cmd: str, check: bool = True, **kw) -> CompletedProcess[str]:
             if "test -d" in cmd or "test -f" in cmd:
                 return CompletedProcess(args="", returncode=1, stdout="", stderr="")
-            if "create_worktree.py" in cmd:
-                call_order.append("create_worktree")
             return _ok()
 
         backend.run = MagicMock(side_effect=run_side)
 
-        with patch("ptq.config.load_config") as mock_cfg:
+        def fake_create(source: str, dest: str) -> list[str]:
+            call_order.append("create_worktree")
+            assert (source, dest) == ("/tmp/ws/pytorch", "/tmp/ws/jobs/test-job/pytorch")
+            return []
+
+        with (
+            patch("ptq.config.load_config") as mock_cfg,
+            patch(
+                "ptq.application.worktree_service.create_submodule_worktree",
+                side_effect=fake_create,
+            ),
+        ):
             mock_cfg.return_value.build_env_prefix.return_value = "USE_NINJA=1 "
             created = provision_worktree(backend, "test-job")
 
         assert created is True
-        assert "create_worktree" in call_order
+        assert call_order == ["create_worktree"]
         mkdir_cmds = [
             call.args[0]
             for call in backend.run.call_args_list
@@ -275,12 +284,10 @@ class TestProvisionWorktree:
             return _ok()
 
         backend.run = MagicMock(side_effect=run_side)
-        created = provision_worktree(backend, "test-job")
+        with patch(
+            "ptq.application.worktree_service.create_submodule_worktree"
+        ) as create:
+            created = provision_worktree(backend, "test-job")
 
         assert created is False
-        run_cmds = [
-            call.args[0]
-            for call in backend.run.call_args_list
-            if isinstance(call.args[0], str)
-        ]
-        assert not any("create_worktree.py" in c for c in run_cmds)
+        create.assert_not_called()
