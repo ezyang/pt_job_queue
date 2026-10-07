@@ -49,7 +49,7 @@ def _make_backend(
             return _cp(stdout=SMOKE_STDOUT)
         if "import torch" in cmd:
             return _cp(returncode=0 if torch_import_ok else 1)
-        if "import transformer_nuggets" in cmd:
+        if 'find_spec("transformer_nuggets")' in cmd:
             return _cp(returncode=0 if nuggets_present else 1)
         if cmd.startswith("cp "):
             return _cp(0)
@@ -276,5 +276,5 @@ class TestTransformerNuggetsInstall:
         assert install_transformer_nuggets(backend, JOB_VENV, skip_if_present=True) is True
 
         cmds = _all_cmds(backend)
-        assert any("import transformer_nuggets" in c for c in cmds)
+        assert any('find_spec("transformer_nuggets")' in c for c in cmds)
         assert not any(TRANSFORMER_NUGGETS_REQUIREMENT in c for c in cmds)
