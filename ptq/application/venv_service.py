@@ -55,7 +55,10 @@ def install_transformer_nuggets(
     """
     if skip_if_present and (
         backend.run(
-            f"cd /tmp && {python_executable} -c 'import {TRANSFORMER_NUGGETS_PACKAGE}' 2>/dev/null",
+            # find_spec, not import: importing pulls in torch (~3-5s).
+            f"cd /tmp && {python_executable} -c 'import importlib.util, sys; "
+            f'sys.exit(importlib.util.find_spec("{TRANSFORMER_NUGGETS_PACKAGE}") is None)\' '
+            "2>/dev/null",
             check=False,
         ).returncode
         == 0
