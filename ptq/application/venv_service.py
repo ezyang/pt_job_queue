@@ -46,8 +46,22 @@ def install_transformer_nuggets(
     *,
     verbose: bool = False,
     progress: ProgressCallback = _noop_progress,
+    skip_if_present: bool = False,
 ) -> bool:
-    """Install transformer_nuggets only after the target venv can import torch."""
+    """Install transformer_nuggets only after the target venv can import torch.
+
+    With ``skip_if_present``, a venv that can already import it (e.g. one
+    cloned from the base venv) is left alone instead of refetched from GitHub.
+    """
+    if skip_if_present and (
+        backend.run(
+            f"cd /tmp && {python_executable} -c 'import {TRANSFORMER_NUGGETS_PACKAGE}' 2>/dev/null",
+            check=False,
+        ).returncode
+        == 0
+    ):
+        progress("transformer_nuggets already installed (from base venv).")
+        return True
     torch_check = backend.run(
         f"cd /tmp && {python_executable} -c 'import torch' 2>/dev/null",
         check=False,
@@ -317,6 +331,7 @@ def _try_clone_base_venv(
         job_python,
         verbose=verbose,
         progress=progress,
+        skip_if_present=True,
     )
 
     log.info("fast-path complete: %s", smoke.stdout.strip())

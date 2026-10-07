@@ -28,7 +28,10 @@ SMOKE_STDOUT = f"{NEW_SRC}/torch/__init__.py 2.7.0 True"
 
 
 def _make_backend(
-    *, torch_import_ok: bool = True, torch_git_version: str = BASE_GIT
+    *,
+    torch_import_ok: bool = True,
+    torch_git_version: str = BASE_GIT,
+    nuggets_present: bool = False,
 ) -> MagicMock:
     backend = MagicMock()
     backend.workspace = WORKSPACE
@@ -46,6 +49,8 @@ def _make_backend(
             return _cp(stdout=SMOKE_STDOUT)
         if "import torch" in cmd:
             return _cp(returncode=0 if torch_import_ok else 1)
+        if "import transformer_nuggets" in cmd:
+            return _cp(returncode=0 if nuggets_present else 1)
         if cmd.startswith("cp "):
             return _cp(0)
         if "rsync" in cmd:
@@ -215,6 +220,13 @@ class TestCloneSuccess:
         assert f"uv pip install --python {JOB_VENV}/bin/python" in install_cmd
         assert "--reinstall-package transformer_nuggets" in install_cmd
 
+    def test_keeps_transformer_nuggets_inherited_from_base_venv(self):
+        backend = _make_backend(nuggets_present=True)
+        assert _try_clone_base_venv(backend, JOB_DIR, WORKTREE) is True
+
+        cmds = _all_cmds(backend)
+        assert not any(TRANSFORMER_NUGGETS_REQUIREMENT in c for c in cmds)
+
     def test_bails_when_smoke_test_fails(self):
         backend = MagicMock()
         backend.workspace = WORKSPACE
@@ -255,4 +267,14 @@ class TestTransformerNuggetsInstall:
 
         cmds = _all_cmds(backend)
         assert any("import torch" in c for c in cmds)
+        assert not any(TRANSFORMER_NUGGETS_REQUIREMENT in c for c in cmds)
+
+    def test_skip_if_present_does_not_refetch(self):
+        backend = MagicMock()
+        backend.run = MagicMock(return_value=_cp(0))
+
+        assert install_transformer_nuggets(backend, JOB_VENV, skip_if_present=True) is True
+
+        cmds = _all_cmds(backend)
+        assert any("import transformer_nuggets" in c for c in cmds)
         assert not any(TRANSFORMER_NUGGETS_REQUIREMENT in c for c in cmds)
