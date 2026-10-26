@@ -147,8 +147,10 @@ def sync_triton(seed_venv: Path, job_venv: Path, log) -> None:
         src = seed_venv / "bin" / rel.rsplit("/", 1)[-1]
         if rel.startswith("../../../bin/") and src.is_file():
             dst = job_venv / "bin" / src.name
-            dst.write_text(src.read_text().replace(str(seed_venv.resolve()), str(job_venv.resolve()))
-                           .replace(str(seed_venv), str(job_venv.resolve())))
+            first, _, rest = src.read_text().partition("\n")
+            if first.startswith("#!"):  # the seed venv's python, by whichever path
+                first = f"#!{job_venv.resolve()}/bin/python"
+            dst.write_text(f"{first}\n{rest}")
             dst.chmod(0o755)
     log(f"copied the seed's triton ({seed_d[0].name[:-len('.dist-info')]}; the job had "
         f"{', '.join(d.name[:-len('.dist-info')] for d in job_d) or 'none'})")

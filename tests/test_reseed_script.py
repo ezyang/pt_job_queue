@@ -49,7 +49,7 @@ def venv(root: Path, src: Path, sha: str) -> Path:
     (sp / f"triton-3.9.0+git{sha[:7]}.dist-info").mkdir()
     (sp / f"triton-3.9.0+git{sha[:7]}.dist-info" / "RECORD").write_text(
         "../../../bin/proton,sha256=x,1\ntriton/__init__.py,sha256=y,1\n")
-    (v / "bin" / "proton").write_text(f"#!{v}/bin/python\nimport triton\n")
+    (v / "bin" / "proton").write_text(f"#!/some/other/path/to{v}/bin/python3\nimport triton\n")
     return v
 
 
