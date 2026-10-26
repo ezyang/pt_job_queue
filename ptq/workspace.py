@@ -7,7 +7,9 @@ from subprocess import CompletedProcess
 from rich.console import Console
 
 from ptq.application.venv_service import (
+    BUILD_SLOTS,
     PYTORCH_TEST_REQUIREMENTS,
+    build_slot_prefix,
     install_transformer_nuggets,
 )
 from ptq.infrastructure.backends import Backend
@@ -211,7 +213,7 @@ def build_pytorch(
     env_scope = f"env -u VIRTUAL_ENV PATH={workspace}/.venv/bin:$PATH "
 
     result = backend.run(
-        f"cd {workspace}/pytorch && {build_env_prefix}{env_scope}{pip_cmd}",
+        f"cd {workspace}/pytorch && {build_env_prefix}{env_scope}{build_slot_prefix(workspace)}{pip_cmd}",
         check=False,
         stream=True,
     )
@@ -239,10 +241,17 @@ def deploy_scripts(backend: Backend) -> None:
 
     dest_dir = Path(workspace.replace("~", str(Path.home()))) / "scripts"
     dest_dir.mkdir(parents=True, exist_ok=True)
-    for script in scripts_dir.glob("*.sh"):
+    for script in [*scripts_dir.glob("*.sh"), *scripts_dir.glob("*.py")]:
         shutil.copy2(script, dest_dir / script.name)
 
     backend.run(f"chmod +x {workspace}/scripts/*.sh")
+    # with-build-slot.sh's slots: one file each. Created here, on the host,
+    # because sandboxes see the workspace read-only.
+    slots = dest_dir.parent / ".build-slots"
+    slots.mkdir(exist_ok=True)
+    if not any(slots.glob("slot-*")):
+        for i in range(BUILD_SLOTS):
+            (slots / f"slot-{i}").touch()
 
     cfg = load_config()
     if cfg.build_env:
