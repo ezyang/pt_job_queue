@@ -16,6 +16,16 @@ ProgressCallback = Callable[[str], None]
 PYTORCH_TEST_REQUIREMENTS = "pytest pytest-xdist"
 TRANSFORMER_NUGGETS_PACKAGE = "transformer_nuggets"
 BUILD_SLOTS = 2
+CCACHE_MAX_SIZE = "60G"
+
+
+def ccache_env(workspace: str) -> str:
+    """Env prefix for a build that uses (and fills) the workspace's shared
+    ccache; see scripts/rebuild.sh, which sets the same."""
+    return (
+        f"CCACHE_DIR={workspace}/.ccache CCACHE_BASEDIR=$(realpath {workspace}) "
+        "CCACHE_NOHASHDIR=true USE_RELATIVE_PATHS=1 "
+    )
 
 
 def build_slot_prefix(workspace: str) -> str:
@@ -441,7 +451,8 @@ def _setup_job_venv(
         progress("Editable install (pytorch)... this takes a few minutes")
         with _timed("editable install", progress):
             result = backend.run(
-                f"cd {worktree_path} && {build_env_prefix}{build_slot_prefix(backend.workspace)}nice -n 19 {pip_cmd}",
+                f"cd {worktree_path} && {build_env_prefix}{ccache_env(backend.workspace)}"
+                f"{build_slot_prefix(backend.workspace)}nice -n 19 {pip_cmd}",
                 check=False,
                 stream=verbose,
             )

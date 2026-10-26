@@ -16,6 +16,16 @@ export PATH="$JOB_DIR/.venv/bin:$PATH"
 
 export CCACHE_NOHASHDIR=true USE_NINJA="${USE_NINJA:-1}" BUILD_TEST="${BUILD_TEST:-0}"
 
+# A ccache shared by the workspace: the nightly seed build fills it, and a
+# job's build of the same sources hits it wherever the job's checkout is
+# (base_dir plus USE_RELATIVE_PATHS). A build that can't write it (an OSS
+# DMZ sandbox sees the workspace read-only) only reads it. Keep in sync with
+# ccache_env() in venv_service.py.
+export CCACHE_DIR="$WORKSPACE/.ccache" CCACHE_BASEDIR="$(realpath "$WORKSPACE")" USE_RELATIVE_PATHS=1
+if [ ! -w "$CCACHE_DIR" ]; then
+    export CCACHE_READONLY=1 CCACHE_TEMPDIR="${TMPDIR:-/tmp}/ccache"
+fi
+
 # A rebase onto a newer seed build moves the source past the job's compiled
 # torch, and recompiling it is nearly a full build. If the source is a seed
 # build plus changes that don't need compiling, copy that build instead (or

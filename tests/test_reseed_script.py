@@ -43,6 +43,13 @@ def venv(root: Path, src: Path, sha: str) -> Path:
     py.write_text("#!/bin/sh\nd=$(sed -n \"s/^install('[^']*', '\\([^']*\\)').*/\\1/p\" "
                   f"{sp}/_editable_skbc_torch.py)\nsed -n \"s/^git_version = '\\(.*\\)'/\\1/p\" \"$d/version.py\"\n")
     py.chmod(0o755)
+    # A triton wheel install, with a console script.
+    (sp / "triton").mkdir()
+    (sp / "triton" / "__init__.py").write_text(f"__version__ = '{sha[:7]}'\n")
+    (sp / f"triton-3.9.0+git{sha[:7]}.dist-info").mkdir()
+    (sp / f"triton-3.9.0+git{sha[:7]}.dist-info" / "RECORD").write_text(
+        "../../../bin/proton,sha256=x,1\ntriton/__init__.py,sha256=y,1\n")
+    (v / "bin" / "proton").write_text(f"#!{v}/bin/python\nimport triton\n")
     return v
 
 
@@ -97,6 +104,10 @@ def test_reseed_copies_the_seed_build(world):
     finder = (sp / "_editable_skbc_torch.py").read_text()
     assert str(wt.resolve()) in finder and str(seed) not in finder
     assert [d.name for d in sp.glob("torch-*.dist-info")] == [f"torch-2.16.0a0+git{new[:7]}.dist-info"]
+    # The seed's triton came along, its console script pointed at the job's venv.
+    assert [d.name for d in sp.glob("triton-*.dist-info")] == [f"triton-3.9.0+git{new[:7]}.dist-info"]
+    assert (sp / "triton" / "__init__.py").read_text() == f"__version__ = '{new[:7]}'\n"
+    assert (job_venv / "bin" / "proton").read_text().startswith(f"#!{job_venv.resolve()}/bin/python\n")
     assert not any("feed the compiled build" in m for m in logs)
 
     # Again: a no-op. A C++ change of the agent's own is pointed out.

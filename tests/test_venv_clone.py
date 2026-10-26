@@ -315,3 +315,5 @@ class TestSlowPathBuild:
         [build] = [c for c in _all_cmds(backend) if "-e ." in c]
         assert f"MAX_JOBS={LOCAL_BUILD_JOBS} " in build
         assert "nice -n 19 uv pip install" in build
+        assert f"CCACHE_DIR={WORKSPACE}/.ccache " in build and "USE_RELATIVE_PATHS=1 " in build
+        assert "with-build-slot.sh" in build
