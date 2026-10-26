@@ -15,6 +15,16 @@ log = logging.getLogger("ptq.venv")
 ProgressCallback = Callable[[str], None]
 PYTORCH_TEST_REQUIREMENTS = "pytest pytest-xdist"
 TRANSFORMER_NUGGETS_PACKAGE = "transformer_nuggets"
+BUILD_SLOTS = 2
+
+
+def build_slot_prefix(workspace: str) -> str:
+    """Shell prefix that runs a build in one of the workspace's build slots
+    (scripts/with-build-slot.sh), or nothing if it isn't deployed yet."""
+    script = f"{workspace}/scripts/with-build-slot.sh"
+    return f"$([ -x {script} ] && echo {script}) "
+
+
 # MAX_JOBS for a job's fallback local build: an eighth of the cores, at least 4.
 LOCAL_BUILD_JOBS = "$(( $(nproc) / 8 > 4 ? $(nproc) / 8 : 4 ))"
 TRANSFORMER_NUGGETS_REQUIREMENT = (
@@ -431,7 +441,7 @@ def _setup_job_venv(
         progress("Editable install (pytorch)... this takes a few minutes")
         with _timed("editable install", progress):
             result = backend.run(
-                f"cd {worktree_path} && {build_env_prefix}nice -n 19 {pip_cmd}",
+                f"cd {worktree_path} && {build_env_prefix}{build_slot_prefix(backend.workspace)}nice -n 19 {pip_cmd}",
                 check=False,
                 stream=verbose,
             )
