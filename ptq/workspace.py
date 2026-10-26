@@ -8,8 +8,10 @@ from rich.console import Console
 
 from ptq.application.venv_service import (
     BUILD_SLOTS,
+    CCACHE_MAX_SIZE,
     PYTORCH_TEST_REQUIREMENTS,
     build_slot_prefix,
+    ccache_env,
     install_transformer_nuggets,
 )
 from ptq.infrastructure.backends import Backend
@@ -213,7 +215,8 @@ def build_pytorch(
     env_scope = f"env -u VIRTUAL_ENV PATH={workspace}/.venv/bin:$PATH "
 
     result = backend.run(
-        f"cd {workspace}/pytorch && {build_env_prefix}{env_scope}{build_slot_prefix(workspace)}{pip_cmd}",
+        f"cd {workspace}/pytorch && {build_env_prefix}{ccache_env(workspace)}{env_scope}"
+        f"{build_slot_prefix(workspace)}{pip_cmd}",
         check=False,
         stream=True,
     )
@@ -252,6 +255,11 @@ def deploy_scripts(backend: Backend) -> None:
     if not any(slots.glob("slot-*")):
         for i in range(BUILD_SLOTS):
             (slots / f"slot-{i}").touch()
+    # The shared ccache (see scripts/rebuild.sh).
+    cache = dest_dir.parent / ".ccache"
+    cache.mkdir(exist_ok=True)
+    if not (cache / "ccache.conf").exists():
+        (cache / "ccache.conf").write_text(f"max_size = {CCACHE_MAX_SIZE}\n")
 
     cfg = load_config()
     if cfg.build_env:

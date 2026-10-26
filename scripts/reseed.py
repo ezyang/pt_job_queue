@@ -130,6 +130,30 @@ def _artifacts(seed_src: Path, wt: Path) -> list[str]:
     return [e for e in entries if e.rstrip("/") not in tracked and not any(t.startswith(e) for t in tracked if t)]
 
 
+def sync_triton(seed_venv: Path, job_venv: Path, log) -> None:
+    """Give the job the seed's triton if it has a different one. The seed
+    reinstalls triton for its commit every night; jobs never build it."""
+    seed_sp, job_sp = _site_packages(seed_venv), _site_packages(job_venv)
+    seed_d, job_d = sorted(seed_sp.glob("triton-*.dist-info")), sorted(job_sp.glob("triton-*.dist-info"))
+    if not seed_d or [d.name for d in seed_d] == [d.name for d in job_d]:
+        return
+    for d in job_d:
+        shutil.rmtree(d)
+    _copy(seed_sp / "triton", job_sp / "triton")
+    _copy(seed_d[0], job_sp / seed_d[0].name)
+    # Its console scripts (proton, ...): RECORD lists them under ../../../bin/.
+    for line in (seed_d[0] / "RECORD").read_text().splitlines():
+        rel = line.split(",")[0]
+        src = seed_venv / "bin" / rel.rsplit("/", 1)[-1]
+        if rel.startswith("../../../bin/") and src.is_file():
+            dst = job_venv / "bin" / src.name
+            dst.write_text(src.read_text().replace(str(seed_venv.resolve()), str(job_venv.resolve()))
+                           .replace(str(seed_venv), str(job_venv.resolve())))
+            dst.chmod(0o755)
+    log(f"copied the seed's triton ({seed_d[0].name[:-len('.dist-info')]}; the job had "
+        f"{', '.join(d.name[:-len('.dist-info')] for d in job_d) or 'none'})")
+
+
 def _rewrite(path: Path, pairs: list[tuple[str, str]]) -> None:
     text = path.read_text()
     for old, new in pairs:
@@ -178,10 +202,7 @@ def reseed(seed: Path, seed_venv: Path, wt: Path, job_venv: Path, force: bool = 
         for pyc in job_sp.glob("__pycache__/_editable_skbc_torch*.pyc"):
             pyc.unlink()
         log(f"copied build/install, {len(arts)} generated path(s), and the editable finder")
-    triton = lambda sp: sorted(d.name for d in sp.glob("triton-*.dist-info"))  # noqa: E731
-    if triton(seed_sp) != triton(job_sp):
-        log(f"note: the seed's triton ({', '.join(triton(seed_sp)) or 'none'}) differs from the job's "
-            f"({', '.join(triton(job_sp)) or 'none'})")
+    sync_triton(seed_venv, job_venv, log)
     r = subprocess.run([str(job_venv / "bin" / "python"), "-c", "import torch; print(torch.version.git_version)"],
                        capture_output=True, text=True, cwd="/tmp", timeout=600, stdin=subprocess.DEVNULL)
     got = r.stdout.strip().splitlines()[-1:] or [""]
@@ -208,7 +229,8 @@ def auto(seed: Path, seed_venv: Path, wt: Path, job_venv: Path, log=lambda m: pr
         if sha != job_sha:
             log(f"reseed: your source is the seed's build commit {sha[:12]} plus changes that don't need "
                 "compiling; copying the seed's build instead of rebuilding")
-            reseed(seed, seed_venv, wt, job_venv, log=log)
+        if sha == seed_sha:
+            reseed(seed, seed_venv, wt, job_venv, log=log)  # also brings the seed's triton
         return 0
     return 3
 
