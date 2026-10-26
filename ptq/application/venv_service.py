@@ -15,6 +15,8 @@ log = logging.getLogger("ptq.venv")
 ProgressCallback = Callable[[str], None]
 PYTORCH_TEST_REQUIREMENTS = "pytest pytest-xdist"
 TRANSFORMER_NUGGETS_PACKAGE = "transformer_nuggets"
+# MAX_JOBS for a job's fallback local build: an eighth of the cores, at least 4.
+LOCAL_BUILD_JOBS = "$(( $(nproc) / 8 > 4 ? $(nproc) / 8 : 4 ))"
 TRANSFORMER_NUGGETS_REQUIREMENT = (
     "transformer_nuggets @ git+https://github.com/drisspg/transformer_nuggets.git"
 )
@@ -75,8 +77,10 @@ def install_transformer_nuggets(
 
     progress("Installing transformer_nuggets...")
     with _timed("transformer_nuggets install", progress):
+        # It depends on torch: without the exclusion, resolving that replaces
+        # the venv's editable torch (and triton) with PyPI wheels.
         result = backend.run(
-            f"uv pip install --python {python_executable} "
+            f"echo torch | uv pip install --python {python_executable} --excludes /dev/stdin "
             f"--reinstall-package {TRANSFORMER_NUGGETS_PACKAGE} "
             f"{shlex.quote(TRANSFORMER_NUGGETS_REQUIREMENT)}",
             check=False,
@@ -175,9 +179,11 @@ def _try_clone_base_venv(
     """Clone base workspace venv + source artifacts instead of rebuilding.
 
     Copies the venv (hardlinks), rsyncs gitignored source artifacts
-    (.so, generated .py) into the worktree, and rewrites editable-install
-    paths.  Skips the cmake build dir — if the agent needs to rebuild C++,
-    ccache handles it (~3 min with warm cache).
+    (generated .py etc.) into the worktree, copies ``build/install`` (where a
+    scikit-build-core editable install keeps the compiled torch that its
+    finder loads), and rewrites editable-install paths.  Skips the rest of
+    the cmake build dir, which isn't relocatable: a C++ rebuild in the job
+    starts from scratch.
     Falls back to the slow editable-install if anything fails.
     """
     workspace = backend.workspace
@@ -245,6 +251,19 @@ def _try_clone_base_venv(
         )
         if r.returncode not in (0, 23):
             progress(f"fast-path bail: rsync failed (rc={r.returncode})")
+            return _bail()
+
+    # The compiled torch: a reflink copy (btrfs), not hardlinks, so a rebuild
+    # in the job can't write through into the seed.
+    if backend.run(f"test -d {old_src}/build/install", check=False).returncode == 0:
+        with _timed("build/install copy", progress):
+            r = backend.run(
+                f"mkdir -p {new_src}/build/install && "
+                f"cp -a --reflink=auto {old_src}/build/install/. {new_src}/build/install/",
+                check=False,
+            )
+        if r.returncode != 0:
+            progress(f"fast-path bail: copying build/install failed (rc={r.returncode})")
             return _bail()
 
     # rsync --link-dest hardlinks copied artifacts to the base workspace. Later
@@ -406,10 +425,14 @@ def _setup_job_venv(
             pip_cmd = f"re-cc -- {pip_cmd}"
             build_env_prefix = f"MAX_JOBS={re_cc_jobs} {build_env_prefix}"
             progress(f"Using re-cc with MAX_JOBS={re_cc_jobs}")
+        if "MAX_JOBS=" not in build_env_prefix:
+            # A local build shares the host with other jobs (and users), and
+            # ninja's default of one job per core has run it out of memory.
+            build_env_prefix = f"MAX_JOBS={LOCAL_BUILD_JOBS} {build_env_prefix}"
         progress("Editable install (pytorch)... this takes a few minutes")
         with _timed("editable install", progress):
             result = backend.run(
-                f"cd {worktree_path} && {build_env_prefix}{pip_cmd}",
+                f"cd {worktree_path} && {build_env_prefix}nice -n 19 {pip_cmd}",
                 check=False,
                 stream=verbose,
             )

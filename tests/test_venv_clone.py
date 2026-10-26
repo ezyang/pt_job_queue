@@ -4,8 +4,10 @@ from subprocess import CompletedProcess
 from unittest.mock import MagicMock
 
 from ptq.application.venv_service import (
+    LOCAL_BUILD_JOBS,
     PYTORCH_TEST_REQUIREMENTS,
     TRANSFORMER_NUGGETS_REQUIREMENT,
+    _setup_job_venv,
     _try_clone_base_venv,
     install_transformer_nuggets,
 )
@@ -219,6 +221,7 @@ class TestCloneSuccess:
         install_cmd = cmds[install_idx]
         assert f"uv pip install --python {JOB_VENV}/bin/python" in install_cmd
         assert "--reinstall-package transformer_nuggets" in install_cmd
+        assert install_cmd.startswith("echo torch | ") and "--excludes /dev/stdin" in install_cmd
 
     def test_keeps_transformer_nuggets_inherited_from_base_venv(self):
         backend = _make_backend(nuggets_present=True)
@@ -278,3 +281,39 @@ class TestTransformerNuggetsInstall:
         cmds = _all_cmds(backend)
         assert any('find_spec("transformer_nuggets")' in c for c in cmds)
         assert not any(TRANSFORMER_NUGGETS_REQUIREMENT in c for c in cmds)
+
+
+class TestBuildInstallCopy:
+    def test_copies_build_install_with_reflinks(self):
+        backend = _make_backend()
+        assert _try_clone_base_venv(backend, JOB_DIR, WORKTREE) is True
+        cmds = _all_cmds(backend)
+
+        copies = [c for c in cmds if "build/install" in c and "cp " in c]
+        assert len(copies) == 1
+        assert f"{OLD_SRC}/build/install/. {NEW_SRC}/build/install/" in copies[0]
+        assert "--reflink=auto" in copies[0]
+        assert "-l" not in copies[0].split()
+        smoke_idx = next(i for i, c in enumerate(cmds) if "cuda.is_available" in c)
+        assert cmds.index(copies[0]) < smoke_idx
+
+    def test_bails_when_copy_fails(self):
+        backend = _make_backend()
+        inner = backend.run.side_effect
+
+        def run_side(cmd: str, check: bool = True, **kw):
+            if "build/install" in cmd and "cp " in cmd:
+                return _cp(1)
+            return inner(cmd, check, **kw)
+
+        backend.run.side_effect = run_side
+        assert _try_clone_base_venv(backend, JOB_DIR, WORKTREE) is False
+
+
+class TestSlowPathBuild:
+    def test_local_build_is_capped_and_niced(self):
+        backend = _make_backend(torch_import_ok=False)
+        _setup_job_venv(backend, JOB_DIR, WORKTREE)
+        [build] = [c for c in _all_cmds(backend) if "-e ." in c]
+        assert f"MAX_JOBS={LOCAL_BUILD_JOBS} " in build
+        assert "nice -n 19 uv pip install" in build
