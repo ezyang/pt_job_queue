@@ -154,9 +154,12 @@ def test_build_slots(tmp_path):
         first = subprocess.Popen([str(script), "sh", "-c", f"touch {hold}.1; sleep 3"])
         while not Path(f"{hold}.1").exists():
             time.sleep(0.05)
+        status = subprocess.run([str(script), "--status"], capture_output=True, text=True).stdout
+        assert status.startswith("slot-0: pid ") and f"touch {hold}.1; sleep 3" in status
         t = time.monotonic()
         second = subprocess.run([str(script), "sh", "-c", "exit 7"], capture_output=True, text=True)
         assert second.returncode == 7  # the command's exit status
+        assert subprocess.run([str(script), "sh", "-c", "exit 213"]).returncode == 1  # not "busy"
         assert time.monotonic() - t >= 2  # waited for the only slot
         assert "busy" in second.stderr
         assert first.wait() == 0

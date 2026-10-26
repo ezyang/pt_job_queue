@@ -11,8 +11,9 @@
 # Slots are flock(1) locks on $WORKSPACE/.build-slots/slot-*; there are as
 # many slots as files (ptq setup creates them). flock works on read-only
 # files, so sandboxes that see the workspace read-only share the same slots.
-# The lock is held by this shell, not by CMD, so a daemon a build leaves
-# running can't keep a slot.
+# The lock is held by a flock process that waits for CMD (-o: CMD doesn't
+# inherit it, so a daemon a build leaves running can't keep a slot), and
+# /proc/locks names that process, which --status shows.
 set -u
 WORKSPACE="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 SLOTS_DIR="$WORKSPACE/.build-slots"
@@ -33,7 +34,13 @@ if [ "${1:-}" = "--status" ]; then
             echo "$(basename "$s"): free"
         else
             for pid in $pids; do
-                echo "$(basename "$s"): $(ps -o pid=,etime=,args= -p "$pid" 2>/dev/null | cut -c1-200) (cwd $(readlink "/proc/$pid/cwd" 2>/dev/null))"
+                # The flock process. Its child is the sh wrapper below, whose
+                # argv is: sh -c SCRIPT sh WAITED SLOT CMD...
+                child=$(pgrep -P "$pid" | head -1)
+                argv=()
+                [ -n "$child" ] && mapfile -d '' -t argv < "/proc/$child/cmdline"
+                cwd=$(readlink "/proc/$child/cwd" 2>/dev/null)
+                echo "$(basename "$s"): pid $pid, for $(ps -o etime= -p "$pid" | tr -d ' '): ${argv[*]:6}${cwd:+ (in $cwd)}" | cut -c1-300
             done
         fi
     done
@@ -49,16 +56,15 @@ if [ ${#slots[@]} -eq 0 ]; then
     exec "$@"
 fi
 
+BUSY=213  # flock's exit status when the slot is taken; CMD's own 213 is mapped to 1
 waited=0
 while :; do
     for s in "${slots[@]}"; do
-        exec 9<"$s" || continue
-        if flock -n 9; then
-            [ $waited -gt 0 ] && echo "with-build-slot: got $(basename "$s") after ${waited}s" >&2
-            "$@" 9<&-
-            exit $?
-        fi
-        exec 9<&-
+        flock -n -o -E $BUSY "$s" sh -c '
+            [ "$1" -gt 0 ] && echo "with-build-slot: got $2 after $1s" >&2
+            shift 2; "$@"; rc=$?; [ $rc -eq '$BUSY' ] && rc=1; exit $rc' sh "$waited" "$(basename "$s")" "$@"
+        rc=$?
+        [ $rc -ne $BUSY ] && exit $rc
     done
     if [ $((waited % 60)) -eq 0 ]; then
         echo "with-build-slot: all ${#slots[@]} build slots are busy; waiting (on the host, $0 --status shows who holds them)" >&2
