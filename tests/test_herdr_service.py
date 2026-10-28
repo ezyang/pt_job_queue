@@ -125,3 +125,59 @@ def test_open_cli_requires_one_selector():
 
     assert result.exit_code == 1
     assert "Provide exactly one JOB_ID, --issue, or --name" in result.output
+
+
+def test_open_cli_no_herdr_creates_job_without_herdr(tmp_path: Path):
+    repo = JobRepository(tmp_path / "jobs.json")
+    backend = MagicMock(workspace="/tmp/ws")
+
+    def ensure_job(job_repo, _backend, **kwargs):
+        assert kwargs["name"] == "my-task"
+        job_repo.save(JobRecord(job_id="job-1", name="my-task", workspace="/tmp/ws"))
+        return "job-1", True
+
+    with (
+        patch("ptq.cli._repo", return_value=repo),
+        patch("ptq.infrastructure.backends.create_backend", return_value=backend),
+        patch(
+            "ptq.application.worktree_service.ensure_job_worktree",
+            side_effect=ensure_job,
+        ) as mock_ensure,
+        patch("ptq.application.herdr_service.open_job_workspace") as mock_open,
+        patch("ptq.application.herdr_service.HerdrClient") as mock_client,
+    ):
+        result = runner.invoke(
+            app,
+            ["open", "--name", "my-task", "--workspace", "/tmp/ws", "--no-herdr"],
+        )
+
+    assert result.exit_code == 0, result.output
+    mock_ensure.assert_called_once()
+    mock_open.assert_not_called()
+    mock_client.assert_not_called()
+    assert "Created PTQ job job-1" in result.output
+    assert "Herdr workspace." not in result.output
+    assert "  job: job-1" in result.output
+    assert "  dir: /tmp/ws/jobs/job-1" in result.output
+    assert "  worktree: /tmp/ws/jobs/job-1/pytorch" in result.output
+    assert (
+        "  entry: cd /tmp/ws/jobs/job-1 && source .venv/bin/activate" in result.output
+    )
+
+
+def test_open_cli_no_herdr_reuses_existing_job(tmp_path: Path):
+    repo = JobRepository(tmp_path / "jobs.json")
+    repo.save(JobRecord(job_id="job-1", issue=123, workspace="/tmp/ws"))
+
+    with (
+        patch("ptq.cli._repo", return_value=repo),
+        patch("ptq.application.worktree_service.prepare_job_worktree") as mock_prep,
+        patch("ptq.application.herdr_service.open_job_workspace") as mock_open,
+    ):
+        result = runner.invoke(app, ["open", "123", "--no-herdr", "--no-focus"])
+
+    assert result.exit_code == 0, result.output
+    mock_prep.assert_called_once()
+    mock_open.assert_not_called()
+    assert "  job: job-1" in result.output
+    assert "  dir: /tmp/ws/jobs/job-1" in result.output

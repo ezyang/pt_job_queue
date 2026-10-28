@@ -27,7 +27,7 @@
 - For a PyTorch issue, prefer `uv run ptq open --issue NUMBER` unless the user explicitly asks for an isolated seed checkout.
 - The fast path uses the existing local seed workspace and clones its venv/build artifacts into `~/.ptq_workspace/jobs/<job-id>`.
 - Use `uv run ptq setup --workspace "$WS" --build` only when a separate built seed checkout is intentional.
-- `ptq open` creates or reuses the PTQ job, writes `prime.md` and job-root `AGENTS.md`, and opens a Herdr workspace without launching an agent.
+- `ptq open` creates or reuses the PTQ job, writes `prime.md` and job-root `AGENTS.md`, and opens a Herdr workspace without launching an agent. Pass `--no-herdr` to skip the Herdr workspace.
 - Treat `uv run ptq takeover JOB_ID` as the source of truth for the worktree entry command; do not reconstruct paths manually.
 - Before deleting or recreating a worktree, check for uncommitted work with `git -C PATH status --short`.
 

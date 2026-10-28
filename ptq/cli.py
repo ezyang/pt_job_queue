@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import time
 from typing import Annotated
@@ -572,8 +573,15 @@ def open_job(
         bool,
         typer.Option("--no-focus", help="Create the workspace without focusing it."),
     ] = False,
+    no_herdr: Annotated[
+        bool,
+        typer.Option(
+            "--no-herdr",
+            help="Create or reuse the job without opening a Herdr workspace.",
+        ),
+    ] = False,
 ) -> None:
-    """Create or reuse a job and open its Herdr workspace."""
+    """Create or reuse a job and open its Herdr workspace (unless --no-herdr)."""
     from ptq.application.herdr_service import open_job_workspace
     from ptq.application.worktree_service import (
         ensure_job_worktree,
@@ -581,6 +589,7 @@ def open_job(
     )
     from ptq.infrastructure.backends import backend_for_job, create_backend
     from ptq.takeover import for_job as takeover_for_job
+    from ptq.takeover import job_dir_path, worktree_path
 
     selectors = sum(value is not None for value in (job_id, issue, name))
     if selectors != 1:
@@ -617,10 +626,23 @@ def open_job(
     except PtqError as e:
         _handle_error(e)
     job = repo.get(job_id)
+    takeover_command = takeover_for_job(job_id, job)
+    if no_herdr:
+        console.print("[bold green]PTQ job ready (no Herdr workspace).[/bold green]")
+        job_dir = os.path.expanduser(job_dir_path(job.workspace, job_id))
+        worktree = os.path.expanduser(worktree_path(job.workspace, job_id, job.repo))
+        for key, value in (
+            ("job", job_id),
+            ("dir", job_dir),
+            ("worktree", worktree),
+            ("entry", takeover_command),
+            ("prime", "@prime.md"),
+        ):
+            console.print(f"  {key}: {escape(value)}", soft_wrap=True)
+        return
     label = (
         f"ptq #{job.issue}" if job.issue is not None else f"ptq {job.name or job_id}"
     )
-    takeover_command = takeover_for_job(job_id, job)
     try:
         workspace = open_job_workspace(
             job_id,
