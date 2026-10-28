@@ -413,7 +413,9 @@ def create_pr(
     _ensure_ssh_remote(backend, worktree, _log)
     _log("Pushing branch...")
     push_result = backend.run(
-        f"cd {worktree} && git push -u origin '{branch}'",
+        # An explicit destination: with push.default=upstream, a bare branch name
+        # pushes to its upstream, which is main for a branch started from origin/main.
+        f"cd {worktree} && git push -u origin '{branch}:refs/heads/{branch}'",
         check=False,
     )
     if push_result.returncode != 0:
