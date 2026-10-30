@@ -765,6 +765,31 @@ def stack_submit(
 
 
 @app.command()
+def review(
+    job_id: Annotated[str, typer.Argument(help="Job ID, name, or issue number.")],
+) -> None:
+    """Run pytorch/pytorch's automated PR review on the job's commits, before submitting."""
+    from ptq.application.review_service import review_job
+
+    repo = _repo()
+    try:
+        job_id = repo.resolve_id(job_id)
+        results = review_job(
+            repo, job_id, log=lambda message: console.print(f"  [dim]{escape(message)}[/dim]")
+        )
+    except PtqError as e:
+        _handle_error(e)
+
+    for r in results:
+        style = {"Approve": "green", "Request Changes": "red"}.get(r.recommendation, "yellow")
+        console.print(
+            f"  [{style}]{escape(r.recommendation)}[/{style}] {escape(r.target.label)}: {escape(str(r.path))}"
+        )
+        if r.error:
+            console.print(f"    [red]{escape(r.error)}[/red]")
+
+
+@app.command()
 def pr(
     job_id: Annotated[str, typer.Argument(help="Job ID or issue number.")],
     note: Annotated[
