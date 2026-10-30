@@ -112,13 +112,7 @@ Submission authorization does not authorize merging, closing PRs, cleaning jobs,
 
 ### Review before submitting
 
-pytorch/pytorch's automated reviewer requests changes on every PR it finds problems in. Before each submission that creates or updates a PR, run the same review locally and fix its blocking findings first:
-
-```bash
-{ptq_command} review {job_id}
-```
-
-It reviews each PR the job would submit (each commit of a ghstack job; the whole change otherwise) with the reviewer's own command, model and effort, in parallel, and writes each review to `{job_dir}/reviews/<sha>.md`. A finding you judge wrong is still worth answering in the PR description, since the automated reviewer will likely raise it again.
+pytorch/pytorch's automated reviewer requests changes on every PR it finds problems in. Before each submission that creates or updates a PR, run that reviewer locally with `pt-auto-review` (see `~/ezyang-tools/pt_auto_review/README.md`) on each PR the job would submit (each commit of a ghstack job, the whole change otherwise), and fix the blocking findings that hold up first. A finding you judge wrong is still worth answering in the PR description, since the automated reviewer will likely raise it again.
 
 ### Draft or ready
 
