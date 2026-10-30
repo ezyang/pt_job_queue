@@ -54,6 +54,7 @@ uv run ptq stack init NAME
 - Read `STACK_CONTEXT.md` and create a linear sequence of independently buildable and tested commits.
 - Keep each feature's tests in the commit that introduces it.
 - Use `uv run ptq stack show JOB_ID` and `uv run ptq stack submit JOB_ID`; never use `ptq pr` for a ghstack job.
+- Before changing an existing PR, read its whole review conversation (comments, reviews, inline comments and replies). When the change departs from a reviewer's request or follows an off-GitHub discussion with the user, explain why in the PR description; reviewers only see what is public.
 - Keep PR titles and bodies matching the code: whenever a push changes a PR's code, update its title and body too (keeping human-authored notes). Ordinary stack updates leave GitHub titles and bodies alone, so update the commit messages and submit with `--update-metadata`.
 - Preserve `ghstack-source-id`, `ghstack-comment-id`, and `Pull-Request` trailers during rewrites.
 - Rebase stacks; do not merge the base branch into them.
