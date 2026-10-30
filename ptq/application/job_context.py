@@ -110,6 +110,10 @@ Stack submission uses each commit's subject/body, not the conventional `--note` 
 
 Submission authorization does not authorize merging, closing PRs, cleaning jobs, changing unrelated metadata, or posting/replying to review comments. Read-only inspection is safe; run mutating commands only for the user's requested action.
 
+### Review before submitting
+
+pytorch/pytorch's automated reviewer requests changes on every PR it finds problems in. Before each submission that creates or updates a PR, run that reviewer locally with `pt-auto-review` (see `~/ezyang-tools/pt_auto_review/README.md`) on each PR the job would submit (each commit of a ghstack job, the whole change otherwise), and fix the blocking findings that hold up first. A finding you judge wrong is still worth answering in the PR description, since the automated reviewer will likely raise it again.
+
 ### Draft or ready
 
 Submit as a draft unless the user has approved the change. Approval is the user clicking Approve on a review page (`oss-dmz diff-page`) that shows it, or approving it in chat ("good", "lgtm"); it counts as a request for a ready-for-review PR. Then submit without `--draft`, and mark any draft PR the approval covers ready with `gh pr ready <N> --repo <owner>/<repo>`.
