@@ -54,7 +54,7 @@ uv run ptq stack init NAME
 - Read `STACK_CONTEXT.md` and create a linear sequence of independently buildable and tested commits.
 - Keep each feature's tests in the commit that introduces it.
 - Use `uv run ptq stack show JOB_ID` and `uv run ptq stack submit JOB_ID`; never use `ptq pr` for a ghstack job.
-- Ordinary stack updates preserve GitHub titles and bodies. Use `--update-metadata` only when explicitly requested.
+- Keep PR titles and bodies matching the code: whenever a push changes a PR's code, update its title and body too (keeping human-authored notes). Ordinary stack updates leave GitHub titles and bodies alone, so update the commit messages and submit with `--update-metadata`.
 - Preserve `ghstack-source-id`, `ghstack-comment-id`, and `Pull-Request` trailers during rewrites.
 - Rebase stacks; do not merge the base branch into them.
 - For PyTorch, `@pytorchbot merge` on a PR lands it and every open PR below it. Do not use the GitHub merge button.

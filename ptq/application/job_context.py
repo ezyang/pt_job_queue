@@ -91,9 +91,9 @@ If the user wants to type their annotation in PTQ's editor, create a separate ta
 
 Let the user answer the title prompt and write/save the human note; do not type it for them or interrupt their pane. PTQ reuses a saved/GitHub human note when one exists, so omission of `--note` does not guarantee an editor opens. If they want to replace an existing note, obtain their new text and pass it explicitly. Inspect the pane result after they finish and report the actual PR URL or concrete failure; process exit alone is not proof of submission.
 
-Existing GitHub PR titles and summaries are the source of truth, especially human-authored notes. Never overwrite, regenerate, refresh, reformat, or replace an existing summary from local reports or commit messages unless the user explicitly requests that metadata change and approves the replacement where required. A request to commit, push, submit, or update code is not permission to change the summary. Preserve all unrelated content when making an authorized targeted edit.
+Keep every PR's title and description matching its code. Whenever you push a code change to an existing PR, update its title and description in the same step so they describe the PR as it now stands (the problem, the fix, the test plan); never leave a description of an earlier version behind. The user always wants this, so it needs no separate request or approval. Human-authored notes are the exception: keep them verbatim, along with unrelated content such as cc lines and issue links, and change only the AI-written parts, which stay marked as AI-generated.
 
-Be careful: `ptq pr` currently rewrites an existing PR body from the artifacts as well as pushing code; it is not a metadata-preserving update command. Do not run it against an existing PR without explicit approval for the body update, even if it reuses the saved human note. For a code-only update, use the repository's approved metadata-preserving submission path instead; do not regenerate the body merely to make the command usable.
+`ptq pr` regenerates an existing PR's body from the job's artifacts, keeping the saved human note, as well as pushing code, so bring `report.md` and `pr_title.txt` up to date before running it. For a PR that PTQ didn't create (an exported or hand-made one), push the code to its head branch and update the title and body with `gh pr edit --title ... --body-file ...`.
 
 ### Submit a ghstack
 
@@ -104,7 +104,7 @@ If `STACK_CONTEXT.md` exists, follow it and use:
 {ptq_command} stack submit {job_id} --draft
 ```
 
-Stack submission uses each commit's subject/body, not the conventional `--note` option or a new note editor. Prepare each commit's human commentary and descriptions for the user's review before publishing. Preserve ghstack trailers; ordinary submission preserves existing PR titles/bodies. Use `--update-metadata` only after explicit approval of the metadata changes. A new stack-oriented job should run `{ptq_command} stack init {job_id}` before implementation. PTQ refuses converting a job already associated with a conventional PR; use a separate stack job, preserving the old PR until the user authorizes closing it.
+Stack submission uses each commit's subject/body, not the conventional `--note` option or a new note editor. Prepare each commit's human commentary and descriptions for the user's review before publishing. Preserve ghstack trailers. Ordinary submission leaves existing PR titles/bodies alone, so when a commit's change changes, update its commit message to match (keeping human-authored notes) and submit with `--update-metadata`. A new stack-oriented job should run `{ptq_command} stack init {job_id}` before implementation. PTQ refuses converting a job already associated with a conventional PR; use a separate stack job, preserving the old PR until the user authorizes closing it.
 
 Submission authorization does not authorize merging, closing PRs, cleaning jobs, changing unrelated metadata, or posting/replying to review comments. Read-only inspection is safe; run mutating commands only for the user's requested action.
 

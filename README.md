@@ -128,7 +128,7 @@ The unified driver workflow lives at `.agents/skills/driver/SKILL.md`; `.pi/prom
 uv run ptq pr JOB_ID
 ```
 
-PTQ submits the current worktree directly. It uses `pr_title.txt`, `pr_labels.txt`, `report.md`, and `worklog.md` when present. Existing GitHub titles and human notes remain the source of truth during updates.
+PTQ submits the current worktree directly. It uses `pr_title.txt`, `pr_labels.txt`, `report.md`, and `worklog.md` when present, and regenerates an existing PR's body from them on update, keeping the human note.
 
 ## Ghstack workflow
 
@@ -146,7 +146,7 @@ uv run ptq stack show MY_STACK
 uv run ptq stack submit MY_STACK --draft
 ```
 
-Ordinary updates preserve GitHub titles and bodies. Use `--update-metadata` only when intentionally replacing them from commit messages.
+Ordinary updates preserve GitHub titles and bodies. Use `--update-metadata` to replace them from the commit messages, as you should whenever a PR's code changed.
 
 For PyTorch, `@pytorchbot merge` on a ghstack PR lands that PR and every open PR below it. Use the bottom PR for one layer or the top PR for the whole stack; do not use the GitHub merge button.
 
