@@ -114,6 +114,7 @@ class TestShebangRewrite:
         assert f"#!{BASE_VENV}/bin/python[0-9.]*" in cmd
         assert f"#!{JOB_VENV}/bin/python" in cmd
         assert f"{JOB_VENV}/bin/*" in cmd
+        assert '[ -L "$f" ] ||' in cmd
 
 
 class TestEditableInstallRewrite:

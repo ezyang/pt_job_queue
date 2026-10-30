@@ -113,6 +113,23 @@ def install_transformer_nuggets(
     return True
 
 
+def _shebang_rewrite_cmd(
+    job_venv: str, base_venv: str, resolved_base_venv: str, resolved_venv: str
+) -> str:
+    """Point the cloned venv's script shebangs at the job venv.
+
+    Scripts carry the base venv's resolved path (e.g. /data/... for a ~/local
+    symlinked workspace), so match it as well as the configured spelling.
+    Symlinks are skipped: sed -i would replace bin/python's link with a copy of
+    the interpreter, which can't find its $ORIGIN-relative libpython.
+    """
+    exprs = " ".join(
+        f'-e "1s|#!{v}/bin/python[0-9.]*|#!{resolved_venv}/bin/python|"'
+        for v in dict.fromkeys(filter(None, (base_venv, resolved_base_venv)))
+    )
+    return f'for f in {job_venv}/bin/*; do [ -L "$f" ] || sed -i {exprs} "$f"; done 2>/dev/null'
+
+
 def _setup_lightweight_venv(
     backend: Backend,
     job_dir: str,
@@ -164,7 +181,9 @@ def _setup_lightweight_venv(
         check=False,
     )
     backend.run(
-        f'sed -i "1s|#!{base_venv}/bin/python[0-9.]*|#!{resolved_venv}/bin/python|" {job_venv}/bin/* 2>/dev/null',
+        _shebang_rewrite_cmd(
+            job_venv, base_venv, _last_line(f"realpath {base_venv}"), resolved_venv
+        ),
         check=False,
     )
 
@@ -326,7 +345,9 @@ def _try_clone_base_venv(
             check=False,
         )
         backend.run(
-            f'sed -i "1s|#!{base_venv}/bin/python[0-9.]*|#!{resolved_venv}/bin/python|" {job_venv}/bin/* 2>/dev/null',
+            _shebang_rewrite_cmd(
+                job_venv, base_venv, _last_line(f"realpath {base_venv}"), resolved_venv
+            ),
             check=False,
         )
 
