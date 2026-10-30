@@ -290,9 +290,9 @@ class TestBuildInstallCopy:
         assert _try_clone_base_venv(backend, JOB_DIR, WORKTREE) is True
         cmds = _all_cmds(backend)
 
-        copies = [c for c in cmds if f"{OLD_SRC}/build/install/ {NEW_SRC}/build/install/" in c]
+        copies = [c for c in cmds if f"{OLD_SRC}/build/install/. {NEW_SRC}/build/install/" in c]
         assert len(copies) == 1
-        assert "--link-dest" not in copies[0]
+        assert "--reflink=auto" in copies[0]
         smoke_idx = next(i for i, c in enumerate(cmds) if "cuda.is_available" in c)
         assert cmds.index(copies[0]) < smoke_idx
 
@@ -301,7 +301,7 @@ class TestBuildInstallCopy:
         inner = backend.run.side_effect
 
         def run_side(cmd: str, check: bool = True, **kw):
-            if f"{OLD_SRC}/build/install/ " in cmd:
+            if f"{OLD_SRC}/build/install/. " in cmd:
                 return _cp(1)
             return inner(cmd, check, **kw)
 

@@ -294,10 +294,11 @@ def _try_clone_base_venv(
         # scikit-build-core editable installs map torch's native and generated
         # files into build/install/<wheel-tag>/, which the build exclude skips.
         # Copy rather than hardlink so a job rebuild's install step cannot write
-        # through to the base workspace.
+        # through to the base workspace; a reflink copy (btrfs) shares blocks
+        # until written, so it is near-instant instead of ~800MB per job.
         r = backend.run(
-            f"if [ -d {old_src}/build/install ]; then mkdir -p {new_src}/build && "
-            f"rsync -a {old_src}/build/install/ {new_src}/build/install/; fi",
+            f"if [ -d {old_src}/build/install ]; then mkdir -p {new_src}/build/install && "
+            f"cp -a --reflink=auto {old_src}/build/install/. {new_src}/build/install/; fi",
             check=False,
         )
         if r.returncode != 0:
