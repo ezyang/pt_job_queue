@@ -73,6 +73,12 @@ uv run ptq open --issue "$ISSUE" --workspace "$WS"
 @prime.md
 ```
 
+To create or reuse a job without opening a Herdr workspace (for example from an agent that works in the job itself), pass `--no-herdr`. The job directory, `prime.md`, `AGENTS.md`, and venv are prepared as usual, and the job id and entry command are printed:
+
+```bash
+uv run ptq open --name scaled-addmm-api --no-herdr
+```
+
 `prime.md` contains the paths and workflow rules. The same context is copied to job-root `AGENTS.md` for agents that discover it automatically.
 
 Use `takeover` when only the shell-entry command is needed:
