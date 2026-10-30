@@ -81,7 +81,7 @@ When the user asks you to submit, prepare the diff, validation, `pr_title.txt`, 
 {ptq_command} pr {job_id} --note 'USER-PROVIDED NOTE' --title 'APPROVED TITLE' --draft
 ```
 
-Replace the placeholders with the approved text, correctly shell-quoted; do not submit the literal placeholders. `--note` accepts multiline text and avoids opening an editor. `--title` avoids a title prompt. Omit `--draft` only when the user requests a ready-for-review PR. This command checks out the submission branch, stages all source-worktree changes, commits when needed, pushes, and creates or updates the PR. Inspect the entire diff/untracked files first and coordinate a final handoff: the user may write their note while you prepare, but do not submit while either of you is still editing the source or PR artifacts.
+Replace the placeholders with the approved text, correctly shell-quoted; do not submit the literal placeholders. `--note` accepts multiline text and avoids opening an editor. `--title` avoids a title prompt. Omit `--draft` only when the user requests a ready-for-review PR or has approved the change (see "Draft or ready" below). This command checks out the submission branch, stages all source-worktree changes, commits when needed, pushes, and creates or updates the PR. Inspect the entire diff/untracked files first and coordinate a final handoff: the user may write their note while you prepare, but do not submit while either of you is still editing the source or PR artifacts.
 
 If the user wants to type their annotation in PTQ's editor, create a separate tab in the same job workspace, leaving their active pane untouched, and run this command there rather than starting an interactive editor inside a captured shell call. In the Herdr TUI, load the Herdr skill and use `herdr pane run`. In the Herdr desktop app (`HC_TERMINAL_ID` set), start a shell tab with `hc run --bg --no-parent --cwd "$PWD" --label herdr.space=<space>` (copy `<space>` from `hc get "$HC_TERMINAL_ID" --json` labels) and send the command with `hc send`:
 
@@ -107,6 +107,17 @@ If `STACK_CONTEXT.md` exists, follow it and use:
 Stack submission uses each commit's subject/body, not the conventional `--note` option or a new note editor. Prepare each commit's human commentary and descriptions for the user's review before publishing. Preserve ghstack trailers; ordinary submission preserves existing PR titles/bodies. Use `--update-metadata` only after explicit approval of the metadata changes. A new stack-oriented job should run `{ptq_command} stack init {job_id}` before implementation. PTQ refuses converting a job already associated with a conventional PR; use a separate stack job, preserving the old PR until the user authorizes closing it.
 
 Submission authorization does not authorize merging, closing PRs, cleaning jobs, changing unrelated metadata, or posting/replying to review comments. Read-only inspection is safe; run mutating commands only for the user's requested action.
+
+### Draft or ready
+
+Submit as a draft unless the user has approved the change. Approval is the user clicking Approve on a review page (`oss-dmz diff-page`) that shows it, or approving it in chat ("good", "lgtm"); it counts as a request for a ready-for-review PR. Then submit without `--draft`, and mark any draft PR the approval covers ready with `gh pr ready <N> --repo <owner>/<repo>`.
+
+### After submitting a new pytorch/pytorch PR
+
+Do both of these right after a submission creates a pytorch/pytorch PR, without asking, and tell the user what you added and why. They don't apply to updates of a PR you already did them for.
+
+- **Reviewers.** Request one or two people who know the code the PR changes: `gh pr edit <N> --repo pytorch/pytorch --add-reviewer <logins>`. Find them among the authors of recent changes to the touched functions (`git log -L` / `git log -- <file>`) and those changes' approvers (`gh pr view <M> --repo pytorch/pytorch --json author,reviews`). Prefer active maintainers of that area over drive-by contributors; never request the PR's author or a bot. Reviewers GitHub auto-requests from CODEOWNERS don't count.
+- **Release-note labels.** `ptq stack submit` doesn't apply `pr_labels.txt` and `ptq pr` may not either, so check the PR's labels afterward and add them with `gh pr edit <N> --repo pytorch/pytorch --add-label '<label>'`. A user-facing change gets exactly one `release notes: <area>` label (e.g. `release notes: inductor`) plus one `topic:` label for its kind (`topic: bug fixes`, `topic: improvements`, `topic: performance`, `topic: new features`, `topic: bc breaking`, `topic: deprecation`, ...). A change no user can observe (tests, CI, internal refactors) gets only `topic: not user facing`. Copy exact names from `gh label list --repo pytorch/pytorch --search '<words>'`. GitHub's labeler may add a second `release notes:` label (e.g. `(aoti)` for C++ wrapper files); keep the one that fits and remove the other.
 """
 
 
